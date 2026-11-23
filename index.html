@@ -1,0 +1,176 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Pathway Studio · 代谢路径绘图</title>
+  <link rel="stylesheet" href="styles.css">
+
+<style id="auth-gate-style">
+  #auth-gate{position:fixed;inset:0;z-index:2147483647;display:flex;align-items:center;justify-content:center;
+    background:#f5f6fa;font-family:-apple-system,BlinkMacSystemFont,"Segoe UI","Microsoft YaHei",sans-serif}
+  #auth-gate .card{background:#fff;border-radius:16px;padding:40px 44px;width:360px;max-width:90vw;
+    box-shadow:0 8px 32px rgba(0,0,0,.08);text-align:center}
+  #auth-gate .logo{font-size:28px;color:#2f6f8f;margin-bottom:6px}
+  #auth-gate h1{font-size:20px;font-weight:600;margin:0 0 6px;color:#1f2329}
+  #auth-gate p{font-size:13px;color:#6b7280;margin:0 0 22px}
+  #auth-gate input{width:100%;box-sizing:border-box;padding:11px 13px;font-size:14px;border:1px solid #d5dae0;
+    border-radius:8px;outline:none}
+  #auth-gate input:focus{border-color:#2f6f8f}
+  #auth-gate button{width:100%;margin-top:14px;padding:11px;font-size:14px;color:#fff;background:#2f6f8f;
+    border:0;border-radius:8px;cursor:pointer}
+  #auth-gate button:hover{background:#275b75}
+  #auth-gate .err{color:#c0392b;font-size:12px;min-height:16px;margin-top:10px}
+  #auth-gate .foot{font-size:11px;color:#9aa1a9;margin-top:18px}
+</style>
+</head>
+<body>
+<div id="auth-gate">
+  <div class="card">
+    <div class="logo">⌘</div>
+    <h1>Pathway Studio</h1>
+    <p>代谢路径绘图工作台 · 请输入访问口令</p>
+    <input id="auth-pwd" type="password" placeholder="访问口令" autocomplete="current-password">
+    <button id="auth-go">进入</button>
+    <div class="err" id="auth-err"></div>
+    <div class="foot">口令仅在本机保存，用于本次访问验证</div>
+  </div>
+</div>
+<script>
+(function(){
+  var HASH = "102275571ecdd758194ec10dd75e47d772abb23df98b28560a0ae78af516a9f2";
+  var KEY = "pathway-studio-auth";
+  function unlock(){
+    var g = document.getElementById('auth-gate');
+    if(g) g.remove();
+    var s = document.getElementById('auth-gate-style');
+    if(s) s.remove();
+    document.body.style.overflow = '';
+  }
+  try{ if(sessionStorage.getItem(KEY)==='1'){ unlock(); return; } }catch(e){}
+  document.body.style.overflow='hidden';
+  document.addEventListener('DOMContentLoaded', function(){
+    var inp=document.getElementById('auth-pwd'), btn=document.getElementById('auth-go'), err=document.getElementById('auth-err');
+    function check(){
+      var v=inp.value||'';
+      var cryptoObj = window.crypto||window.msCrypto;
+      if(!cryptoObj || !cryptoObj.subtle){ err.textContent='当前环境不支持安全验证，请用 https 打开'; return; }
+      cryptoObj.subtle.digest('SHA-256', new TextEncoder().encode(v)).then(function(buf){
+        var hex=Array.prototype.map.call(new Uint8Array(buf), function(b){return ('0'+b.toString(16)).slice(-2);}).join('');
+        if(hex===HASH){ try{sessionStorage.setItem(KEY,'1');}catch(e){} unlock(); }
+        else { err.textContent='口令不正确，请重试'; inp.select(); }
+      });
+    }
+    btn.addEventListener('click', check);
+    inp.addEventListener('keydown', function(e){ if(e.key==='Enter') check(); });
+    inp.focus();
+  });
+})();
+</script>
+
+  <header class="app-header">
+    <div class="brand"><span class="brand-icon">⌘</span><div>Pathway <b>Studio</b><small>代谢路径绘图工作台</small></div></div>
+    <div class="project-heading"><input id="project-name" aria-label="项目名称" value="一碳代谢 · 路径示意图"><span id="save-state">本地编辑</span></div>
+    <div class="header-actions"><button id="help-button" class="quiet">使用指南</button><button id="open-button">打开</button><button id="save-button">保存项目</button><button id="export-button" class="primary">导出图形</button><button id="inspector-toggle" aria-label="切换属性面板">属性</button></div>
+  </header>
+  <div class="workspace">
+    <aside class="library">
+      <div class="sidebar-title">绘图组件 <span>LIBRARY</span></div>
+      <p class="muted intro">选择组件，再点击画布放置</p>
+      <div class="library-grid">
+        <button class="palette-card" data-tool="metabolite" draggable="true"><span class="preview-label" aria-hidden="true">M</span><b>代谢物</b></button>
+        <button class="palette-card" data-tool="rounded" draggable="true"><span class="preview-pill" aria-hidden="true">M</span><b>高亮代谢物</b></button>
+        <button class="palette-card" data-tool="reaction"><span class="preview-line">⟶</span><b>反应连线</b></button>
+        <button class="palette-card" data-tool="right-route" title="右侧圆角绕行"><span aria-hidden="true"><svg width="30" height="25" viewBox="0 0 30 25" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M3 8v9q0 5 5 5h14q5 0 5-5V8q0-5-5-5H12m3-2-3 2 3 2"/></svg></span><b>右侧圆角绕行</b></button>
+        <button class="palette-card" data-tool="text" draggable="true"><span class="preview-text">Aa</span><b>文字注释</b></button>
+        <button class="palette-card" data-tool="module" draggable="true"><span class="preview-module">···</span><b>模块框</b></button>
+        <button class="palette-card" id="structure-button" title="细胞膜、通道蛋白、细胞器、微生物"><span class="preview-text">◉</span><b>生物组件</b></button>
+      </div>
+      <button id="cycle-button" class="cycle-button"><span>⟳</span><div><b>环形途径</b></div></button>
+      <button id="demo-button" class="palette-card gallery-card"><span class="preview-text" aria-hidden="true">▧</span><b>示例图库</b></button>
+      <div class="library-bottom"><span class="local-icon">▣</span><div>数据保存在本机<small>定期保存项目文件，便于备份</small></div></div>
+    </aside>
+    <main class="editor">
+      <div class="board-strip" aria-label="画板导航"><span class="board-strip-label">画板</span><div id="board-list" role="tablist" aria-label="画板"></div><button id="add-board" title="添加画板" aria-label="添加画板">＋</button></div>
+      <div class="toolbar">
+        <div class="tool-group"><button data-tool="select" class="active" title="选择 (V)">↖ <span>选择</span></button><button data-tool="pan" title="平移 (H)">✥ <span>平移</span></button><button data-tool="arrow" title="绘制独立箭头 (A)" aria-label="箭头">⟶ <span>箭头</span></button></div>
+        <div class="tool-group"><button id="undo" title="撤销 Ctrl+Z" aria-label="撤销">↶</button><button id="redo" title="重做 Ctrl+Shift+Z" aria-label="重做">↷</button></div>
+        <div class="tool-group"><button id="copy-button" title="复制 Ctrl+C">复制</button><button id="paste-button" title="粘贴 Ctrl+V" disabled>粘贴</button></div>
+        <div class="tool-group"><button id="align-x" title="所选节点水平对齐">水平对齐</button><button id="align-y" title="所选节点垂直对齐">垂直对齐</button><button id="ring-button" title="将所选代谢物排列在圆环上">圆环排列</button><button id="group-button" title="组合 Ctrl+G">组合</button><button id="ungroup-button" title="解除组合">解组</button></div>
+        <label class="snap-label"><input type="checkbox" id="snap">网格吸附</label>
+      </div>
+      <div id="chemical-toolbar" class="chemical-toolbar" role="toolbar" aria-label="化学结构绘制工具">
+        <span class="chemical-toolbar-label">结构</span>
+        <div class="chem-tool-group"><button data-chem-action="202" title="单键（双击连续绘制）" aria-label="单键">—</button><button data-chem-action="203" title="双键（双击连续绘制）" aria-label="双键">＝</button><button data-chem-action="204" title="三键（双击连续绘制）" aria-label="三键">≡</button><button data-chem-action="wedge" title="实楔键（双击连续绘制）" aria-label="实楔键"><svg viewBox="0 0 24 20" aria-hidden="true"><path d="M2 10 22 3 22 17Z" fill="currentColor"/></svg></button><button data-chem-action="hashed" title="虚楔键（立体键）（双击连续绘制）" aria-label="虚楔键"><svg viewBox="0 0 24 20" aria-hidden="true"><path d="M3 9v2m4-4v6m4-8v10m4-12v14m5-16v18" stroke="currentColor" stroke-width="1.6"/></svg></button><button data-chem-action="dashed" title="虚线键（双击连续绘制）" aria-label="虚线键">┄</button><button data-chem-action="wavy" title="波浪键（立体未指定）（双击连续绘制）" aria-label="波浪键">∿</button></div>
+        <div class="chem-tool-group" role="group" aria-label="环与碳链">
+          <button data-chem-action="206" title="三元环（双击连续绘制）" aria-label="三元环">△</button>
+          <button data-chem-action="207" title="四元环（双击连续绘制）" aria-label="四元环">□</button>
+          <button data-chem-action="208" title="五元环（双击连续绘制）" aria-label="五元环">⬠</button>
+          <button data-chem-action="210" title="六元环（双击连续绘制）" aria-label="六元环">⬡</button>
+          <button data-chem-action="209" title="苯环（双击连续绘制）" aria-label="苯环">⌬</button>
+          <button data-chem-action="chain" title="短碳链（双击连续绘制）">短碳链</button>
+        </div>
+        <div class="chem-tool-group" role="group" aria-label="常用基团">
+          <button data-chem-group="COOH" title="羧基" aria-label="COOH 羧基">COOH</button>
+          <button data-chem-group="OH" title="羟基" aria-label="OH 羟基">OH</button>
+          <button data-chem-group="NH2" title="氨基" aria-label="NH₂ 氨基">NH₂</button>
+          <button data-chem-group="CH3" title="甲基" aria-label="CH₃ 甲基">CH₃</button>
+          <button data-chem-group="CHO" title="醛基" aria-label="CHO 醛基">CHO</button>
+        </div>
+        <div class="chem-tool-group chem-utility-group" role="group" aria-label="结构操作">
+          <button data-chem-action="106" title="擦除原子、键或结构">擦除</button>
+          <button id="chemical-import-tool" title="模板、SMILES 或 MOL">导入</button>
+          <button id="chemical-style-tool" title="为画板上的化学结构应用绘图样式">结构样式</button>
+        </div>
+        <span id="chemical-tool-state" class="chemical-tool-state"></span>
+      </div>
+      <div class="canvas-stage" id="stage">
+        <div class="canvas-caption"><span id="board-caption">FIGURE 01</span><span id="paper-size">1200 × 820 px</span></div>
+        <svg id="canvas" xmlns="http://www.w3.org/2000/svg" aria-label="代谢路径编辑画布" tabindex="0"></svg>
+        <div id="reaction-actions" class="reaction-actions" hidden></div>
+        <div id="atom-label-editor" hidden><input id="atom-label-input" aria-label="原子或基团" maxlength="16" placeholder="O-、NH3+、COOH…" autocomplete="off"><small>Enter 确认 · Esc 取消</small></div>
+        <div id="inline-text-editor" hidden>
+          <div class="inline-text-tools" role="toolbar" aria-label="文字格式">
+            <select id="inline-font-family" aria-label="文字字体" title="当前标签的字体"><option value="">跟随画板</option><option value="Arial, Microsoft YaHei, sans-serif">Arial</option><option value="Times New Roman, Microsoft YaHei, serif">Times New Roman</option><option value="Calibri, Microsoft YaHei, sans-serif">Calibri</option><option value="Microsoft YaHei, sans-serif">微软雅黑</option><option value="SimSun, serif">宋体</option><option value="Consolas, monospace">Consolas</option></select>
+            <input id="inline-font-size" type="number" min="6" max="200" aria-label="文字字号" title="当前标签的字号">
+            <input id="inline-font-color" type="color" aria-label="文字颜色" title="当前标签的颜色">
+            <button type="button" id="inline-font-bold" aria-label="文字加粗" aria-pressed="false" title="加粗当前标签"><b>B</b></button>
+            <button type="button" class="inline-color-swatch" data-text-color="#c75140" aria-label="红色文字" title="红色文字" style="background:#c75140"></button>
+            <button type="button" class="inline-color-swatch" data-text-color="#202c29" aria-label="黑色文字" title="黑色文字" style="background:#202c29"></button>
+            <button type="button" data-script="sub" aria-label="下标" title="选中字符后设为下标">x<sub>2</sub></button>
+            <button type="button" data-script="super" aria-label="上标" title="选中字符后设为上标">x<sup>2</sup></button>
+            <button type="button" data-script="normal" aria-label="恢复正常文字">正常</button>
+            <button type="button" id="inline-text-done" class="primary" aria-label="完成文字编辑">完成</button>
+            <button type="button" id="inline-text-cancel" aria-label="取消文字编辑">×</button>
+          </div>
+          <div id="inline-text-input" contenteditable="true" role="textbox" aria-label="画布文字" aria-multiline="true" spellcheck="false"></div>
+          <div class="inline-text-help">选中字符设置上下标 · Enter 完成 · Shift+Enter 换行</div>
+        </div>
+        <div class="canvas-hint" id="tool-hint">拖动节点调整布局 · 双击修改文字 · Shift 多选</div>
+        <div class="zoom-controls"><button id="zoom-out" aria-label="缩小">−</button><span id="zoom-value">100%</span><button id="zoom-in" aria-label="放大">＋</button><i></i><button id="fit" title="适应画布">适应</button></div>
+      </div>
+      <footer class="statusbar"><span id="selection-status">未选择对象</span><span id="object-count"></span><span>SVG 矢量画布 <b>·</b> 手工编辑</span></footer>
+    </main>
+    <aside class="inspector"><div class="sidebar-title">属性 <span>PROPERTIES</span></div><div id="inspector-content"></div></aside>
+  </div>
+  <input type="file" id="file-input" accept=".json,application/json" hidden>
+  <dialog id="export-dialog"><form method="dialog"><div class="dialog-heading"><div><h2>导出你的路径图</h2><p>保留细节，让图形适合论文与汇报。</p></div><button value="cancel" aria-label="关闭">×</button></div><label>导出范围<select id="export-scope"><option value="current">当前画板</option><option value="all">全部画板 · 垂直拼接</option></select></label><div class="export-options"><button type="button" id="export-svg"><b>SVG</b><span>可编辑矢量图</span><small>推荐用于论文排版</small></button><button type="button" id="export-png"><b>PNG</b><span>高分辨率图片</span><small>3 倍画板像素</small></button></div><p class="muted">导出白色背景，不包含网格、选框或编辑控制点。</p></form></dialog>
+  <dialog id="help-dialog"><form method="dialog"><div class="dialog-heading"><h2>从一条反应开始</h2><button aria-label="关闭">×</button></div><ol class="help-list"><li><b>添加代谢物</b><p>点击组件并放到画布，直接原位输入；Enter 或点击空白处保存，Esc 取消。</p></li><li><b>手绘化学结构</b><p>在顶部选键或环，直接在主画板放置、连接或拼环。点原子输入元素，双击原子可输入 COOH 等基团。</p></li><li><b>连接反应</b><p>按 R，依次点击底物和产物。选择连线后，可设置酶名、虚线、方向、侧支和敲除。</p></li><li><b>调整路径</b><p>拖动节点；曲线选中后拖动蓝色控制点。拖动酶标签调整其位置，直接拖动辅因子箭头沿主反应移动连接位置；橙色控制点调整弯曲，两端名称可单独拖动。</p></li><li><b>精细排版</b><p>Shift 点击或空白处拖框多选；Ctrl+G 组合，Ctrl+D 复制，Delete 删除。空格＋拖动平移，滚轮缩放。</p></li><li><b>保存与导出</b><p>Ctrl+S 保存项目 JSON。“打开”可恢复全部画板；SVG 和 PNG 导出当前图或全部画板。</p></li></ol><p class="help-note">双击文字进入原位编辑；选中字符后点 x₂ / x² 设置下标或上标，点“正常”恢复。Shift+Enter 换行。示例用于绘图演示，反应关系与基因标注需按研究证据自行核对。</p><button class="primary">开始绘图</button></form></dialog>
+  <dialog id="confirm-dialog"><form method="dialog"><h2 id="confirm-title">确认操作</h2><p id="confirm-message"></p><div class="dialog-buttons"><button value="cancel">取消</button><button value="confirm" class="primary">继续</button></div></form></dialog>
+  <dialog id="example-dialog"><form method="dialog"><div class="dialog-heading"><div><h2>示例图库</h2><p>点选示例打开为新画板。编辑后可在这里更新示例。</p></div><button aria-label="关闭示例图库">×</button></div><div class="inspector-actions example-actions"><button id="example-save" type="button">将当前画板存为新示例</button><button id="example-update" type="button" hidden>更新当前示例</button></div><div id="example-options"></div></form></dialog>
+  <dialog id="chemical-dialog"><form id="chemical-form"><div class="dialog-heading"><div><h2>化学结构</h2><p>像画图一样绘制分子，完成后直接连接反应箭头。</p></div><button type="button" id="chemical-close" aria-label="关闭化学结构编辑">×</button></div><div class="chemical-tabs"><button type="button" id="chemical-draw-tab" aria-pressed="true">手工绘制</button><button type="button" id="chemical-input-tab" aria-pressed="false">SMILES / MOL</button></div><div class="chemical-layout"><div><label class="field">常用结构<select id="chemical-preset"><option value="">选择模板或自行输入</option><option value="CO">甲醇</option><option value="CCO">乙醇</option><option value="CC=O">乙醛</option><option value="CC(=O)O">乙酸</option><option value="NCC(=O)O">甘氨酸</option><option value="CC(=O)C(=O)O">丙酮酸</option><option value="O=C(O)CCC(=O)O">琥珀酸</option></select></label><div id="chemical-draw-panel"><iframe id="chemical-sketcher" title="原子、化学键与环结构绘制"></iframe><p class="sketch-hint">顶部选择化学键或环；指向原子后输入 C、N、O 等元素字母。撤销与重做使用主工具栏。</p></div><div id="chemical-input-panel" hidden><label class="field">输入格式<select id="chemical-type"><option value="smiles">SMILES</option><option value="mol">MOL 文件内容</option></select></label><label class="field">结构输入<textarea id="chemical-source" rows="7" spellcheck="false" placeholder="例如：CCO" maxlength="200000"></textarea></label><button type="button" id="chemical-import">导入 MOL 文件</button><input type="file" id="chemical-file" accept=".mol" hidden></div></div><div><svg id="chemical-preview" xmlns="http://www.w3.org/2000/svg" aria-label="化学结构预览" viewBox="0 0 320 270"></svg><label class="field">名称（可选）<input id="chemical-name" maxlength="2000" placeholder="例如：乙醇"></label><label class="field">显示方式<select id="chemical-display"><option value="both">结构＋名称</option><option value="structure">仅结构</option><option value="name">仅名称</option></select></label><label class="field">原子配色<select id="chemical-colors"><option value="mono">黑白</option><option value="elements">元素配色</option></select></label><p class="muted">支持常规小分子的二维结构；立体化学和电荷以输入内容为准。</p></div></div><p id="chemical-status" role="status">输入结构后点击“生成预览”。</p><div class="dialog-buttons"><button type="button" id="chemical-preview-button">生成预览</button><button class="primary" id="chemical-apply" type="submit" disabled>放到画布</button></div></form></dialog>
+  <dialog id="component-dialog"><form method="dialog"><div class="dialog-heading"><div><h2 id="component-title">生物组件</h2><p>点选后放到画布，可缩放、旋转和改色。</p></div><button aria-label="关闭组件选择">×</button></div><div id="component-filters" aria-label="组件分类"><button type="button" data-component-group="all">全部</button><button type="button" data-component-group="membrane">膜与通道</button><button type="button" data-component-group="organelle">细胞器</button><button type="button" data-component-group="microbe">微生物</button></div><div id="component-options"></div></form></dialog>
+  <dialog id="cycle-dialog"><form id="cycle-form"><div class="dialog-heading"><div><h2>一次画出整条环形途径</h2><p>自动排好圆周节点、反应箭头和酶标签。</p></div><button type="button" id="cycle-close" aria-label="关闭环形途径">×</button></div><div class="cycle-layout"><div><label class="field">模板<select id="cycle-template"><option value="tca">TCA 循环</option><option value="custom">自定义环形途径</option></select></label><label class="field">化合物与酶名<textarea id="cycle-rows" rows="9" spellcheck="false" aria-describedby="cycle-format"></textarea></label><p class="muted" id="cycle-format">每行：化合物 | 催化它到下一行的酶<br>最后一行自动连接第一行；酶名可以留空。</p></div><div><svg id="cycle-preview" xmlns="http://www.w3.org/2000/svg" aria-label="环形途径实时预览"></svg><div class="field-row"><label class="field">半径<input id="cycle-radius" type="number" value="180" min="60" max="2000" step="10" required></label><label class="field">字号<input id="cycle-font" type="number" value="17" min="10" max="40" required></label></div><label class="field">环内标题<input id="cycle-title" value="TCA" maxlength="80"></label><label class="field">反应方向<select id="cycle-direction"><option value="clockwise">顺时针</option><option value="counterclockwise">逆时针</option></select></label><label class="field"><input type="checkbox" id="cycle-cofactors" checked> 加入 TCA 示例辅因子</label></div></div><p id="cycle-feedback" role="status"></p><div class="dialog-buttons"><button type="button" id="cycle-cancel">取消</button><button class="primary" id="cycle-submit" type="submit">放置到画布</button></div></form></dialog>
+  <div id="toast" role="status"></div>
+  <dialog id="structure-style-dialog" aria-labelledby="structure-style-title">
+    <form method="dialog">
+      <div class="dialog-heading"><h2 id="structure-style-title">化学结构样式</h2><button aria-label="关闭">×</button></div>
+      <label class="field">应用范围
+        <select id="structure-style-scope"><option value="board">当前画板（结构、箭头和文字）</option><option value="selection">所选结构</option></select>
+      </label>
+      <div id="structure-style-options" class="structure-style-options"></div>
+      <p id="structure-style-status" role="status" hidden></p>
+    </form>
+  </dialog>
+  <script src="core.js"></script><script src="app.js"></script>
+</body>
+</html>
